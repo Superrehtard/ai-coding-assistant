@@ -18,8 +18,6 @@ def explain_code_with_llm(code: str, language: str):
         language=language or "unspecified"
     )
 
-    logger.info(f"Whats the prompt: {prompt}")
-
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
@@ -33,7 +31,8 @@ def explain_code_with_llm(code: str, language: str):
             }
         ],
         response_format={ "type": "json_object" },
-        temperature=0.1
+        temperature=0.1,
+        timeout=15
     )
 
     content = response.choices[0].message.content
@@ -44,6 +43,6 @@ def explain_code_with_llm(code: str, language: str):
         logger.info(f"parsed json: {parsed}")
         return parsed
     except json.JSONDecodeError as e:
-        logger.error(f"JSON Decode Error: {e}")  # Debug print
-        logger.error(f"Content that failed: {content}")  # Debug print
+        logger.error(f"JSON Decode Error: {e}")
+        logger.error(f"Content that failed: {content}")
         raise ValueError(f"LLM returned invalid JSON: {str(e)}")

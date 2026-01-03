@@ -1,14 +1,18 @@
 from fastapi import FastAPI, HTTPException
 from app.llm_client import explain_code_with_llm
 from app.schemas import ExplainRequest, ExplainResponse
-import json
 import traceback
+import logging
 
 app = FastAPI(title="AI Code Assistant")
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 @app.post("/explain", response_model=ExplainResponse)
 def explain_code(request: ExplainRequest) -> ExplainResponse:
+    logger.info("Received explain request")
     try:
         response = explain_code_with_llm(
             code=request.code,
@@ -17,4 +21,5 @@ def explain_code(request: ExplainRequest) -> ExplainResponse:
         return ExplainResponse(**response)
     except Exception as e:
         error_detail = f"{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+        logger.error("Failed to process LLM response", exc_info=True)
         raise HTTPException(status_code=500, detail=error_detail)
