@@ -1,0 +1,13 @@
+[project]
+name = "ai-coding-assistant"
+version = "0.1.0"
+description = "LLM-powered code explanation API"
+requires-python = ">=3.10"
+
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "python-dotenv",
+    "openai"
+]
