@@ -1,6 +1,6 @@
-## Refined ADR 0001
+# Refined ADR 0001
 
-### Context
+## Context
 
 We are building an AI-assisted code explainer service. The system takes a request with code and the programming language and responds with a simple, human-readable explanation of the code.
 
