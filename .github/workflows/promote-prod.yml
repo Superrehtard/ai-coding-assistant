@@ -41,7 +41,14 @@ jobs:
       # Copy the tested DEV image into PROD registry (same digest, new location)
       # Using gcrane is the documented approach for copying AR Docker images. :contentReference[oaicite:1]{index=1}
       - name: Install gcrane
-        run: gcloud components install gcrane --quiet
+        run: |
+          curl -L \
+            https://github.com/google/go-containerregistry/releases/latest/download/go-containerregistry_Linux_x86_64.tar.gz \
+            -o go-containerregistry.tar.gz
+          tar -zxvf go-containerregistry.tar.gz gcrane
+          chmod +x gcrane
+          sudo mv gcrane /usr/local/bin/gcrane
+          gcrane --help > /dev/null
 
       - name: Copy image DEV -> PROD
         env:
