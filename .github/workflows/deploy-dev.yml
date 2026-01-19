@@ -1,0 +1,58 @@
+name: Deploy to Dev (Cloud Run)
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  id-token: write # required for GitHub OIDC -> GCP WIF
+
+env:
+  REGION: us-central1
+  PROJECT_ID: ai-coding-assistant-dev
+  REPO: containers
+  IMAGE: ai-coding-assistant
+  SERVICE: ai-coding-assistant-api-dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Keyless auth to Google Cloud via Workload Identity Federation
+      - name: Auth to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      # Allow docker to push to Artifact Registry in us-central
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # Build and push linux/amd64 image (Cloud Run needs Linux images)
+      - name: Build and push image
+        run: |
+          docker buildx create --use --name builder || docker buildx use builder
+          docker buildx build \
+            --platform linux/amd64 \
+            -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/$IMAGE:${{ github.sha }}
+            -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/$IMAGE:dev-latest \
+            --push .
+      
+      # Deploy to Cloud Run (dev)
+      - name: Deploy to Cloud Run (dev)
+        run: |
+          gcloud run deploy $SERVICE \
+            --image $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/$IMAGE:${{ github.sha }} \
+            --region $REGION \
+            --allow-unauthenticated \
+            --port 8000
