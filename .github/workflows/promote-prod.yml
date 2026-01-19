@@ -1,0 +1,64 @@
+name: Promote to Prod (Cloud Run)
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Git commit SHA to promote (must exist in DEV registry)"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  REGION: us-central1
+
+  DEV_PROJECT: ai-coding-assistant-dev
+  PROD_PROJECT: ai-coding-assistant-prod
+
+  REPO: containers
+  IMAGE: ai-coding-assistant
+
+  PROD_SERVICE: ai-coding-assistant-api
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auth to Google Cloud (prod)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER_PROD }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_PROD }}
+    
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+      
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # Copy the tested DEV image into PROD registry (same digest, new location)
+      # Using gcrane is the documented approach for copying AR Docker images. :contentReference[oaicite:1]{index=1}
+      - name: Install gcrane
+        run: gcloud components install gcrane --quiet
+
+      - name: Copy image DEV -> PROD
+        env:
+          SHA: ${{ inputs.sha }}
+        run: |
+          SRC="${REGION}-docker.pkg.dev/${DEV_PROJECT}/${REPO}/${IMAGE}:${SHA}"
+          DST="${REGION}-docker.pkg.dev/${PROD_PROJECT}/${REPO}/${IMAGE}:${SHA}"
+          gcrane cp "${SRC}" "${DST}"
+          # Optional convenience tag:
+          gcrane tag "${DST}" prod-latest
+
+      - name: Deploy to Cloud Run (prod)
+        env:
+          SHA: ${{ inputs.sha }}
+        run: |
+          gcloud run deploy "${PROD_SERVICE}" \
+            --image "${REGION}-docker.pkg.dev/${PROD_PROJECT}/${REPO}/${IMAGE}:${SHA}" \
+            --region "${REGION}" \
+            --allow-unauthenticated \
+            --port 8000
